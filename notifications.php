@@ -131,7 +131,7 @@ require_once __DIR__ . '/includes/header.php';
                             Lihat Temuan
                         </a>
                     <?php else: ?>
-                        <a href="division/improve.php?id=<?= $notif['finding_id'] ?>" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+                        <a href="division/dashboard.php?report=<?= $notif['finding_id'] ?>" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
                             Tindak Lanjut
                         </a>
                     <?php endif; ?>

@@ -169,6 +169,12 @@ require_once __DIR__ . '/../includes/header.php';
         <h1 class="page-title">Kelola User Akses</h1>
         <p class="page-subtitle">Beri hak akses login bagi setiap divisi untuk perbaikan audit</p>
     </div>
+    <div>
+        <button type="button" id="btn-trigger-add" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-symbols-rounded">add</span>
+            Tambah User
+        </button>
+    </div>
 </div>
 
 <?php if (!empty($success)): ?>
@@ -179,7 +185,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<div class="layout-grid">
+<div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
     <!-- User List -->
     <div class="card-section">
         <div class="card-section-header">
@@ -219,8 +225,8 @@ require_once __DIR__ . '/../includes/header.php';
                             <td>
                                 <?php if ($user_row['role'] === 'division'): ?>
                                     <div class="action-links" style="justify-content: center;">
-                                        <a href="?edit=<?= $user_row['id'] ?>" class="action-link edit">Edit</a>
-                                        <a href="?delete=<?= $user_row['id'] ?>" class="action-link delete">Hapus</a>
+                                        <a href="?edit=<?= $user_row['id'] ?>" class="action-link edit" title="Edit"><span class="material-symbols-rounded">edit</span></a>
+                                        <a href="?delete=<?= $user_row['id'] ?>" class="action-link delete" title="Hapus"><span class="material-symbols-rounded">delete</span></a>
                                     </div>
                                 <?php else: ?>
                                     <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem;">Utama</div>
@@ -232,13 +238,16 @@ require_once __DIR__ . '/../includes/header.php';
             </table>
         </div>
     </div>
+</div>
 
-    <!-- User Edit/Add Form -->
-    <div class="card-section">
-        <div class="card-section-header">
-            <h2 class="card-section-title"><?= $edit_user ? 'Edit Akun Divisi' : 'Buat Akun Divisi Baru' ?></h2>
+<!-- Modal for User Add/Edit -->
+<div id="form-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-title-text"><?= $edit_user ? 'Edit Akun Divisi' : 'Buat Akun Divisi Baru' ?></h2>
+            <span class="modal-close" id="modal-close-btn">&times;</span>
         </div>
-        <div style="padding: 1.5rem;">
+        <div class="modal-body">
             <form action="users.php" method="POST">
                 <input type="hidden" name="action" value="<?= $edit_user ? 'edit' : 'add' ?>">
                 <?php if ($edit_user): ?>
@@ -250,14 +259,14 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="text" name="username" id="username_form" class="form-control" placeholder="Contoh: user_hrga" value="<?= $edit_user ? htmlspecialchars($edit_user['username']) : '' ?>" required>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" style="margin-top: 1rem;">
                     <label for="password_form" class="form-label">
                         Password <?= $edit_user ? '<span style="font-weight: 300; font-size: 0.8rem; color: var(--text-secondary);">(Kosongkan jika tidak diubah)</span>' : '' ?>
                     </label>
                     <input type="password" name="password" id="password_form" class="form-control" placeholder="Masukkan password" <?= $edit_user ? '' : 'required' ?>>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 1.25rem;">
+                <div class="form-group" style="margin-top: 1rem;">
                     <label for="division_id" class="form-label">Akses Divisi</label>
                     <select name="division_id" id="division_id" class="form-control" required>
                         <option value="" disabled <?= !$edit_user ? 'selected' : '' ?>>Pilih Divisi</option>
@@ -269,7 +278,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 1.5rem;">
+                <div class="form-group" style="margin-top: 1rem; margin-bottom: 1.5rem;">
                     <label for="area_id" class="form-label">Akses Area</label>
                     <select name="area_id" id="area_id" class="form-control">
                         <option value="0">Pilih Divisi Terlebih Dahulu</option>
@@ -278,9 +287,7 @@ require_once __DIR__ . '/../includes/header.php';
                 
                 <div style="display: flex; gap: 0.75rem;">
                     <button type="submit" class="btn btn-primary" style="flex: 1;"><?= $edit_user ? 'Simpan Akun' : 'Buat Akun' ?></button>
-                    <?php if ($edit_user): ?>
-                        <a href="users.php" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center;">Batal</a>
-                    <?php endif; ?>
+                    <button type="button" id="btn-cancel-form" class="btn btn-secondary" style="min-width: 100px;">Batal</button>
                 </div>
             </form>
         </div>
@@ -296,6 +303,49 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const divisionSelect = document.getElementById('division_id');
     const areaSelect = document.getElementById('area_id');
+    
+    const modal = document.getElementById('form-modal');
+    const btnTriggerAdd = document.getElementById('btn-trigger-add');
+    const btnCloseModal = document.getElementById('modal-close-btn');
+    const btnCancelForm = document.getElementById('btn-cancel-form');
+
+    // Automatically open modal in Edit Mode
+    if (editUser && modal) {
+        modal.classList.add('active');
+    }
+
+    // Toggle modal show
+    if (btnTriggerAdd && modal) {
+        btnTriggerAdd.addEventListener('click', () => {
+            modal.classList.add('active');
+        });
+    }
+
+    // Toggle modal close handlers
+    function closeModal() {
+        if (editUser) {
+            window.location.href = 'users.php';
+        } else if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    if (btnCloseModal) {
+        btnCloseModal.addEventListener('click', closeModal);
+    }
+    if (btnCancelForm) {
+        btnCancelForm.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeModal();
+        });
+    }
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }
 
     function populateAreas(divisionId, selectedAreaId = 0) {
         areaSelect.innerHTML = '';

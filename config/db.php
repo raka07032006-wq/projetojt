@@ -63,4 +63,68 @@ function get_letter_grade($score) {
     if ($val < 4.0) return 'A-';
     return 'A';
 }
+
+/**
+ * Helper to compress and resize an uploaded image to keep database size small
+ */
+function compress_uploaded_image($tmp_path, $mime, $max_width = 800, $max_height = 800, $quality = 75) {
+    if (!extension_loaded('gd') || !function_exists('imagecreatetruecolor')) {
+        return file_get_contents($tmp_path);
+    }
+    
+    switch ($mime) {
+        case 'image/jpeg':
+        case 'image/jpg':
+            $img = @imagecreatefromjpeg($tmp_path);
+            break;
+        case 'image/png':
+            $img = @imagecreatefrompng($tmp_path);
+            break;
+        case 'image/gif':
+            $img = @imagecreatefromgif($tmp_path);
+            break;
+        case 'image/webp':
+            if (function_exists('imagecreatefromwebp')) {
+                $img = @imagecreatefromwebp($tmp_path);
+            } else {
+                return file_get_contents($tmp_path);
+            }
+            break;
+        default:
+            return file_get_contents($tmp_path);
+    }
+    
+    if (!$img) {
+        return file_get_contents($tmp_path);
+    }
+    
+    $width = imagesx($img);
+    $height = imagesy($img);
+    $ratio = $width / $height;
+    
+    if ($width > $max_width || $height > $max_height) {
+        if ($max_width / $max_height > $ratio) {
+            $new_height = $max_height;
+            $new_width = $max_height * $ratio;
+        } else {
+            $new_width = $max_width;
+            $new_height = $max_width / $ratio;
+        }
+        
+        $new_img = imagecreatetruecolor($new_width, $new_height);
+        imagealphablending($new_img, false);
+        imagesavealpha($new_img, true);
+        
+        imagecopyresampled($new_img, $img, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+        imagedestroy($img);
+        $img = $new_img;
+    }
+    
+    ob_start();
+    imagejpeg($img, null, $quality);
+    $data = ob_get_clean();
+    
+    imagedestroy($img);
+    return $data;
+}
 ?>

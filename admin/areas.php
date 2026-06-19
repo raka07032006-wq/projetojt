@@ -165,7 +165,7 @@ require_once __DIR__ . '/../includes/header.php';
     <form method="GET" action="areas.php" style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0;">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <label for="bulan" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">Bulan:</label>
-            <select name="bulan" id="bulan" class="form-control" style="width: 140px; padding: 0.45rem 0.75rem;" onchange="this.form.submit()">
+            <select name="bulan" id="bulan" class="form-control form-control-sm" style="width: 140px;" onchange="this.form.submit()">
                 <?php
                 $bulan_names = [
                     1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -181,7 +181,7 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <label for="tahun" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">Tahun:</label>
-            <select name="tahun" id="tahun" class="form-control" style="width: 100px; padding: 0.45rem 0.75rem;" onchange="this.form.submit()">
+            <select name="tahun" id="tahun" class="form-control form-control-sm" style="width: 100px;" onchange="this.form.submit()">
                 <?php
                 for ($y = 2025; $y <= 2030; $y++) {
                     $selected = ($y == $selected_year) ? 'selected' : '';
@@ -192,17 +192,19 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <label for="filter_div" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">Filter Divisi:</label>
-            <select name="filter_div" id="filter_div" class="form-control" style="width: 200px; padding: 0.45rem 0.75rem;" onchange="this.form.submit()">
+            <select name="filter_div" id="filter_div" class="form-control form-control-sm" style="width: 200px;" onchange="this.form.submit()">
                 <option value="0">Semua Divisi</option>
                 <?php foreach ($divisions as $d): ?>
                     <option value="<?= $d['id'] ?>" <?= ($selected_div == $d['id']) ? 'selected' : '' ?>><?= htmlspecialchars($d['name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div style="margin-left: 1.5rem;">
-            <a href="../print_report.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&division_id=<?= $selected_div > 0 ? $selected_div : 'all' ?>" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; border-radius: 4px; font-weight: 600; color: white;">
-                <span class="material-symbols-rounded" style="font-size: 1.15rem;">print</span>
-                <?= $selected_div > 0 ? 'Cetak Laporan' : 'Cetak Laporan Semua Divisi' ?>
+        <div style="margin-left: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
+            <a href="../print_report.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&division_id=<?= $selected_div > 0 ? $selected_div : 'all' ?>" target="_blank" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: var(--radius-sm); text-decoration: none; color: white;" title="<?= $selected_div > 0 ? 'Cetak Laporan' : 'Cetak Laporan Semua Divisi' ?>">
+                <span class="material-symbols-rounded" style="font-size: 1.25rem;">print</span>
+            </a>
+            <a href="../export_excel.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&division_id=<?= $selected_div > 0 ? $selected_div : 'all' ?>" class="btn btn-sm" style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: var(--radius-sm); text-decoration: none; color: white; background-color: var(--success);" title="<?= $selected_div > 0 ? 'Ekspor Excel' : 'Ekspor Excel Semua Divisi' ?>">
+                <span class="material-symbols-rounded" style="font-size: 1.25rem;">grid_on</span>
             </a>
         </div>
         <div style="margin-left: auto; font-size: 0.85rem; color: var(--text-secondary);">
@@ -211,7 +213,7 @@ require_once __DIR__ . '/../includes/header.php';
     </form>
 </div>
 
-<div class="layout-grid">
+<div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
     <!-- List of Areas -->
     <div class="card-section">
         <div class="card-section-header" style="flex-wrap: wrap; gap: 1rem;">
@@ -255,7 +257,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <td style="text-align: center; font-weight: 800; color: <?= $grade_color ?>;"><?= $grade ?></td>
                                 <td>
                                     <div class="action-links" style="justify-content: center;">
-                                        <a href="?edit=<?= $area['id'] ?>&bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&filter_div=<?= $selected_div ?>" class="action-link edit">Edit Nilai</a>
+                                        <a href="?edit=<?= $area['id'] ?>&bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&filter_div=<?= $selected_div ?>" class="action-link edit" title="Edit Nilai"><span class="material-symbols-rounded">edit</span></a>
                                     </div>
                                 </td>
                             </tr>
@@ -264,14 +266,16 @@ require_once __DIR__ . '/../includes/header.php';
                 </tbody>
             </table>
         </div>
-    </div>
+</div>
 
-    <!-- Edit Score Form -->
-    <div class="card-section" style="align-self: start;">
-        <div class="card-section-header">
-            <h2 class="card-section-title"><?= $edit_area ? 'Edit Area & Nilai' : 'Pilih Area Untuk Mengedit Nilai' ?></h2>
+<!-- Modal for Edit Area & Nilai -->
+<div id="score-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit Area & Nilai</h3>
+            <span class="modal-close" id="modal-close-btn">&times;</span>
         </div>
-        <div style="padding: 1.5rem;">
+        <div class="modal-body">
             <?php if ($edit_area): ?>
                 <form action="areas.php" method="POST">
                     <input type="hidden" name="action" value="edit">
@@ -280,36 +284,31 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="tahun" value="<?= $selected_year ?>">
                     <input type="hidden" name="filter_div" value="<?= $selected_div ?>">
                     
-                    <div class="form-group" style="margin-bottom: 1rem;">
+                    <div class="form-group">
                         <label class="form-label" style="color: var(--text-secondary);">Divisi Terkait</label>
                         <input type="text" class="form-control" style="background-color: var(--bg-main); opacity: 0.8; font-weight: 600;" value="<?= htmlspecialchars($edit_area['division_name']) ?>" disabled>
                     </div>
 
-                    <div class="form-group" style="margin-bottom: 1rem;">
+                    <div class="form-group" style="margin-top: 1rem;">
                         <label class="form-label" style="color: var(--text-secondary);">Periode Penilaian</label>
                         <input type="text" class="form-control" style="background-color: var(--bg-main); opacity: 0.8; font-weight: 600; color: var(--accent);" value="<?= $bulan_names[$selected_month] ?> <?= $selected_year ?>" disabled>
                     </div>
 
-                    <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <div class="form-group" style="margin-top: 1rem;">
                         <label for="name" class="form-label">Nama Area *</label>
                         <input type="text" name="name" id="name" class="form-control" value="<?= htmlspecialchars($edit_area['name']) ?>" required placeholder="Contoh: Kantor lantai 1">
                     </div>
 
-                    <div class="form-group" style="margin-bottom: 1.75rem;">
+                    <div class="form-group" style="margin-top: 1rem; margin-bottom: 1.75rem;">
                         <label for="nilai_5r" class="form-label">Nilai 5R (Skala 0.00 - 4.00)</label>
                         <input type="number" step="0.01" min="0" max="4" name="nilai_5r" id="nilai_5r" class="form-control" value="<?= $edit_area['nilai_5r'] !== null ? number_format($edit_area['nilai_5r'], 2) : '' ?>" placeholder="Contoh: 3.20">
                     </div>
                     
                     <div style="display: flex; gap: 0.75rem;">
                         <button type="submit" class="btn btn-primary" style="flex: 1;">Simpan Perubahan</button>
-                        <a href="areas.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&filter_div=<?= $selected_div ?>" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center;">Batal</a>
+                        <button type="button" id="btn-cancel-modal" class="btn btn-secondary" style="min-width: 100px;">Batal</button>
                     </div>
                 </form>
-            <?php else: ?>
-                <div style="text-align: center; color: var(--text-secondary); padding: 3rem 1rem;">
-                    <span class="material-symbols-rounded" style="font-size: 3rem; color: var(--border-color); margin-bottom: 1rem; display: block;">edit_note</span>
-                    Silakan klik tombol <strong>"Edit Nilai"</strong> pada salah satu area kerja di daftar sebelah kiri untuk memperbarui Nilai 5R bulanan area tersebut.
-                </div>
             <?php endif; ?>
         </div>
     </div>
@@ -319,6 +318,37 @@ require_once __DIR__ . '/../includes/header.php';
 document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('adminAreaSearch');
     const tableRows = document.querySelectorAll('.admin-area-row');
+
+    // Modal elements logic
+    const modal = document.getElementById('score-modal');
+    const btnCloseModal = document.getElementById('modal-close-btn');
+    const btnCancelModal = document.getElementById('btn-cancel-modal');
+    const editArea = <?= json_encode($edit_area) ?>;
+
+    if (editArea && modal) {
+        modal.classList.add('active');
+    }
+
+    function closeModal() {
+        window.location.href = 'areas.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&filter_div=<?= $selected_div ?>';
+    }
+
+    if (btnCloseModal) {
+        btnCloseModal.addEventListener('click', closeModal);
+    }
+    if (btnCancelModal) {
+        btnCancelModal.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeModal();
+        });
+    }
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }
 
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {

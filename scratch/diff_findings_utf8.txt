@@ -1,0 +1,792 @@
+﻿diff --git a/admin/findings.php b/admin/findings.php
+index 2c1836a..4489343 100644
+--- a/admin/findings.php
++++ b/admin/findings.php
+@@ -49,54 +49,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
+                 continue;
+             }
+             
+-            // Check file upload for this specific item index
+-            if (isset($_FILES['finding_photo']['name'][$index]) && $_FILES['finding_photo']['error'][$index] === UPLOAD_ERR_OK) {
+-                $file_name = $_FILES['finding_photo']['name'][$index];
+-                $file_tmp = $_FILES['finding_photo']['tmp_name'][$index];
+-                
+-                $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
++            $file_field = "finding_photo_" . $index;
++            $uploaded_files = [];
++            $has_upload_errors = false;
++
++            if (isset($_FILES[$file_field]) && is_array($_FILES[$file_field]['name'])) {
++                $file_count = count($_FILES[$file_field]['name']);
+                 $allowed_exts = ['jpg', 'jpeg', 'png', 'webp'];
++                $valid_files = [];
+                 
+-                if (in_array($ext, $allowed_exts)) {
+-                    $new_filename = 'before_' . time() . '_' . uniqid() . '.' . $ext;
+-                    $target_path = __DIR__ . '/../uploads/' . $new_filename;
+-                    
+-                    if (move_uploaded_file($file_tmp, $target_path)) {
+-                        try {
+-                            $stmt = $pdo->prepare("
+-                                INSERT INTO findings (area, division_id, description, pic, status, finding_photo, due_date) 
+-                                VALUES (:area, :division_id, :description, :pic, 'On Progress', :finding_photo, :due_date)
+-                            ");
+-                            $stmt->execute([
+-                                'area' => $item_area,
+-                                'division_id' => $division_id,
+-                                'description' => $desc,
+-                                'pic' => $pic,
+-                                'finding_photo' => $new_filename,
+-                                'due_date' => $due_date_val
+-                            ]);
+-                            
+-                            // Send notification to division
+-                            $last_id = $pdo->lastInsertId();
+-                            create_notification(
+-                                $pdo,
+-                                $last_id,
+-                                $division_id,
+-                                "Temuan Audit Baru",
+-                                "Admin menambahkan temuan baru di area " . $item_area . ": \"" . $desc . "\"",
+-                                "division"
+-                            );
+-                            
+-                            $success_count++;
+-                        } catch (PDOException $e) {
+-                            $errors[] = 'Gagal menyimpan item ke-' . ($index+1) . ': ' . $e->getMessage();
+-                            unlink($target_path);
++                for ($i = 0; $i < $file_count; $i++) {
++                    if ($_FILES[$file_field]['error'][$i] === UPLOAD_ERR_OK) {
++                        $file_name = $_FILES[$file_field]['name'][$i];
++                        $file_tmp = $_FILES[$file_field]['tmp_name'][$i];
++                        $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
++                        
++                        if (in_array($ext, $allowed_exts)) {
++                            $valid_files[] = [
++                                'tmp' => $file_tmp,
++                                'ext' => $ext
++                            ];
++                        } else {
++                            $errors[] = 'Ekstensi file item ke-' . ($index+1) . ' tidak diizinkan.';
++                            $has_upload_errors = true;
++                            break;
+                         }
+-                    } else {
+-                        $errors[] = 'Gagal mengunggah foto item ke-' . ($index+1) . '.';
++                    } else if ($_FILES[$file_field]['error'][$i] !== UPLOAD_ERR_NO_FILE) {
++                        $errors[] = 'Gagal mengunggah salah satu foto item ke-' . ($index+1) . '.';
++                        $has_upload_errors = true;
++                        break;
+                     }
+-                } else {
+-                    $errors[] = 'Ekstensi file item ke-' . ($index+1) . ' tidak diizinkan.';
++                }
++
++                if ($has_upload_errors) {
++                    continue;
++                }
++
++                if (empty($valid_files)) {
++                    $errors[] = 'Minimal satu foto wajib diunggah untuk item temuan ke-' . ($index+1) . '.';
++                    continue;
++                }
++
++                // Insert finding row
++                try {
++                    $stmt = $pdo->prepare("
++                        INSERT INTO findings (area, division_id, description, pic, status, due_date) 
++                        VALUES (:area, :division_id, :description, :pic, 'On Progress', :due_date)
++                    ");
++                    $stmt->execute([
++                        'area' => $item_area,
++                        'division_id' => $division_id,
++                        'description' => $desc,
++                        'pic' => $pic,
++                        'due_date' => $due_date_val
++                    ]);
++                    $last_id = $pdo->lastInsertId();
++                    
++                    // Upload files and insert into finding_images in DB as compressed blobs
++                    $stmt_img = $pdo->prepare("
++                        INSERT INTO finding_images (finding_id, image_path, image_data, mime_type, type) 
++                        VALUES (:finding_id, :image_path, :image_data, :mime_type, 'before')
++                    ");
++                    
++                    foreach ($valid_files as $vf) {
++                        $fake_filename = 'before_' . time() . '_' . uniqid() . '.' . $vf['ext'];
++                        $mime = 'image/' . ($vf['ext'] === 'jpg' ? 'jpeg' : $vf['ext']);
++                        $compressed_data = compress_uploaded_image($vf['tmp'], $mime);
++                        
++                        $stmt_img->execute([
++                            'finding_id' => $last_id,
++                            'image_path' => $fake_filename,
++                            'image_data' => $compressed_data,
++                            'mime_type' => $mime
++                        ]);
++                    }
++                    
++                    // Send notification to division
++                    create_notification(
++                        $pdo,
++                        $last_id,
++                        $division_id,
++                        "Temuan Audit Baru",
++                        "Admin menambahkan temuan baru di area " . $item_area . ": \"" . $desc . "\"",
++                        "division"
++                    );
++                    
++                    $success_count++;
++                } catch (PDOException $e) {
++                    $errors[] = 'Gagal menyimpan item ke-' . ($index+1) . ': ' . $e->getMessage();
+                 }
+             } else {
+                 $errors[] = 'Foto wajib diunggah untuk item temuan ke-' . ($index+1) . '.';
+@@ -130,65 +170,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
+ 
+     if ($id > 0 && !empty($area) && $division_id > 0 && !empty($description)) {
+         try {
+-            // Check if photo is replaced
+-            if (isset($_FILES['finding_photo']) && $_FILES['finding_photo']['error'] === UPLOAD_ERR_OK) {
+-                $file = $_FILES['finding_photo'];
+-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+-                $allowed_exts = ['jpg', 'jpeg', 'png', 'webp'];
+-                
+-                if (in_array($ext, $allowed_exts)) {
+-                    $new_filename = 'before_' . time() . '_' . uniqid() . '.' . $ext;
+-                    $target_path = __DIR__ . '/../uploads/' . $new_filename;
+-                    
+-                    if (move_uploaded_file($file['tmp_name'], $target_path)) {
+-                        // Delete old photo
+-                        $old_photo = $pdo->query("SELECT finding_photo FROM findings WHERE id = $id")->fetchColumn();
+-                        if ($old_photo && file_exists(__DIR__ . '/../uploads/' . $old_photo)) {
+-                            unlink(__DIR__ . '/../uploads/' . $old_photo);
++            $pdo->beginTransaction();
++            
++            // 1. Update finding details
++            $stmt = $pdo->prepare("
++                UPDATE findings 
++                SET area = :area, division_id = :division_id, description = :description, 
++                    pic = :pic, status = :status, due_date = :due_date
++                WHERE id = :id
++            ");
++            $stmt->execute([
++                'area' => $area,
++                'division_id' => $division_id,
++                'description' => $description,
++                'pic' => $pic,
++                'status' => $status,
++                'due_date' => $due_date_val,
++                'id' => $id
++            ]);
++
++            // 2. Handle photo deletions
++            if (isset($_POST['delete_photo']) && is_array($_POST['delete_photo'])) {
++                foreach ($_POST['delete_photo'] as $photo_id) {
++                    $photo_id = intval($photo_id);
++                    $img = $pdo->query("SELECT image_path FROM finding_images WHERE id = $photo_id AND finding_id = $id")->fetch();
++                    if ($img) {
++                        $target_path = __DIR__ . '/../uploads/' . $img['image_path'];
++                        if (file_exists($target_path)) {
++                            @unlink($target_path);
+                         }
+-                        
+-                        $stmt = $pdo->prepare("
+-                            UPDATE findings 
+-                            SET area = :area, division_id = :division_id, description = :description, 
+-                                pic = :pic, status = :status, finding_photo = :finding_photo, due_date = :due_date
+-                            WHERE id = :id
+-                        ");
+-                        $stmt->execute([
+-                            'area' => $area,
+-                            'division_id' => $division_id,
+-                            'description' => $description,
+-                            'pic' => $pic,
+-                            'status' => $status,
+-                            'finding_photo' => $new_filename,
+-                            'due_date' => $due_date_val,
+-                            'id' => $id
+-                        ]);
+-                    } else {
+-                        throw new Exception('Gagal mengunggah foto baru.');
++                        $pdo->exec("DELETE FROM finding_images WHERE id = $photo_id");
+                     }
+-                } else {
+-                    throw new Exception('Ekstensi foto baru tidak diizinkan.');
+                 }
+-            } else {
+-                // Update without photo replacement
+-                $stmt = $pdo->prepare("
+-                    UPDATE findings 
+-                    SET area = :area, division_id = :division_id, description = :description, 
+-                        pic = :pic, status = :status, due_date = :due_date
+-                    WHERE id = :id
++            }
++
++            // 3. Handle additional photo uploads (Before)
++            if (isset($_FILES['finding_photo']['name']) && is_array($_FILES['finding_photo']['name'])) {
++                $file_count = count($_FILES['finding_photo']['name']);
++                $allowed_exts = ['jpg', 'jpeg', 'png', 'webp'];
++                $stmt_img = $pdo->prepare("
++                    INSERT INTO finding_images (finding_id, image_path, image_data, mime_type, type) 
++                    VALUES (:finding_id, :image_path, :image_data, :mime_type, 'before')
+                 ");
+-                $stmt->execute([
+-                    'area' => $area,
+-                    'division_id' => $division_id,
+-                    'description' => $description,
+-                    'pic' => $pic,
+-                    'status' => $status,
+-                    'due_date' => $due_date_val,
+-                    'id' => $id
+-                ]);
++
++                for ($i = 0; $i < $file_count; $i++) {
++                    if ($_FILES['finding_photo']['error'][$i] === UPLOAD_ERR_OK) {
++                        $file_name = $_FILES['finding_photo']['name'][$i];
++                        $file_tmp = $_FILES['finding_photo']['tmp_name'][$i];
++                        $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
++
++                        if (in_array($ext, $allowed_exts)) {
++                            $fake_filename = 'before_' . time() . '_' . uniqid() . '.' . $ext;
++                            $mime = 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext);
++                            $compressed_data = compress_uploaded_image($file_tmp, $mime);
++
++                            $stmt_img->execute([
++                                'finding_id' => $id,
++                                'image_path' => $fake_filename,
++                                'image_data' => $compressed_data,
++                                'mime_type' => $mime
++                            ]);
++                        }
++                    }
++                }
+             }
++
++            $pdo->commit();
+             $success = 'Temuan audit berhasil diperbarui.';
+         } catch (Exception $e) {
++            if ($pdo->inTransaction()) {
++                $pdo->rollBack();
++            }
+             $error = 'Gagal memperbarui temuan: ' . $e->getMessage();
+         }
+     } else {
+@@ -201,21 +253,18 @@ if (isset($_GET['delete'])) {
+     $id = intval($_GET['delete']);
+     if ($id > 0) {
+         try {
+-            $finding = $pdo->query("SELECT finding_photo, improvement_photo FROM findings WHERE id = $id")->fetch();
+-            if ($finding) {
+-                if ($finding['finding_photo'] && file_exists(__DIR__ . '/../uploads/' . $finding['finding_photo'])) {
+-                    unlink(__DIR__ . '/../uploads/' . $finding['finding_photo']);
++            // Delete all image files from physical disk (if exist)
++            $images = $pdo->query("SELECT image_path FROM finding_images WHERE finding_id = $id")->fetchAll();
++            foreach ($images as $img) {
++                $file_path = __DIR__ . '/../uploads/' . $img['image_path'];
++                if (file_exists($file_path)) {
++                    @unlink($file_path);
+                 }
+-                if ($finding['improvement_photo'] && file_exists(__DIR__ . '/../uploads/' . $finding['improvement_photo'])) {
+-                    unlink(__DIR__ . '/../uploads/' . $finding['improvement_photo']);
+-                }
+-                
+-                $stmt = $pdo->prepare("DELETE FROM findings WHERE id = :id");
+-                $stmt->execute(['id' => $id]);
+-                $_SESSION['success_message'] = 'Temuan audit dan berkas fotonya berhasil dihapus.';
+-            } else {
+-                $_SESSION['error_message'] = 'Temuan audit tidak ditemukan.';
+             }
++            
++            $stmt = $pdo->prepare("DELETE FROM findings WHERE id = :id");
++            $stmt->execute(['id' => $id]);
++            $_SESSION['success_message'] = 'Temuan audit dan berkas fotonya berhasil dihapus.';
+         } catch (PDOException $e) {
+             $_SESSION['error_message'] = 'Gagal menghapus temuan audit: ' . $e->getMessage();
+         }
+@@ -275,6 +324,21 @@ $stmt = $pdo->prepare($query_findings);
+ $stmt->execute($params);
+ $findings_list = $stmt->fetchAll();
+ 
++// Batch fetch images to avoid N+1 queries
++$finding_ids = array_column($findings_list, 'id');
++$finding_images = [];
++if (!empty($finding_ids)) {
++    $in_clause = implode(',', array_fill(0, count($finding_ids), '?'));
++    $stmt_imgs = $pdo->prepare("SELECT id, finding_id, type, image_path FROM finding_images WHERE finding_id IN ($in_clause) ORDER BY id ASC");
++    $stmt_imgs->execute($finding_ids);
++    foreach ($stmt_imgs->fetchAll() as $img) {
++        $finding_images[$img['finding_id']][$img['type']][] = [
++            'id' => $img['id'],
++            'path' => $img['image_path']
++        ];
++    }
++}
++
+ // Distinct values for filters
+ $areas = $pdo->query("SELECT DISTINCT area AS name FROM findings ORDER BY area ASC")->fetchAll();
+ $divisions = $pdo->query("SELECT * FROM divisions ORDER BY name ASC")->fetchAll();
+@@ -299,6 +363,12 @@ require_once __DIR__ . '/../includes/header.php';
+         <h1 class="page-title">Monitoring & Kelola Temuan Audit 5R</h1>
+         <p class="page-subtitle">Daftarkan temuan baru, tentukan divisinya, dan pantau kemajuan perbaikannya</p>
+     </div>
++    <div>
++        <button type="button" id="btn-trigger-add" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
++            <span class="material-symbols-rounded">add</span>
++            Tambah Temuan
++        </button>
++    </div>
+ </div>
+ 
+ <?php if (!empty($success)): ?>
+@@ -309,9 +379,7 @@ require_once __DIR__ . '/../includes/header.php';
+     <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+ <?php endif; ?>
+ 
+-<div class="layout-grid">
+-    <!-- Findings List & Filters -->
+-    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
++<div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+         
+         <!-- Filter Card -->
+         <div class="card-section" style="margin-bottom: 0;">
+@@ -322,7 +390,7 @@ require_once __DIR__ . '/../includes/header.php';
+                 <form action="findings.php" method="GET" class="filter-form">
+                     <div class="form-group" style="margin-bottom: 0;">
+                         <label for="filter_area_sel" class="form-label" style="margin-bottom: 0.25rem;">Area</label>
+-                        <select name="filter_area" id="filter_area_sel" class="form-control" style="padding: 0.5rem;">
++                        <select name="filter_area" id="filter_area_sel" class="form-control">
+                             <option value="">Semua Area</option>
+                             <?php foreach ($areas as $a): ?>
+                                 <option value="<?= htmlspecialchars($a['name']) ?>" <?= $filter_area === $a['name'] ? 'selected' : '' ?>><?= htmlspecialchars($a['name']) ?></option>
+@@ -332,7 +400,7 @@ require_once __DIR__ . '/../includes/header.php';
+ 
+                     <div class="form-group" style="margin-bottom: 0;">
+                         <label for="filter_div_sel" class="form-label" style="margin-bottom: 0.25rem;">Divisi</label>
+-                        <select name="filter_division" id="filter_div_sel" class="form-control" style="padding: 0.5rem;">
++                        <select name="filter_division" id="filter_div_sel" class="form-control">
+                             <option value="0">Semua Divisi</option>
+                             <?php foreach ($divisions as $d): ?>
+                                 <option value="<?= $d['id'] ?>" <?= $filter_division == $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['name']) ?></option>
+@@ -342,7 +410,7 @@ require_once __DIR__ . '/../includes/header.php';
+ 
+                     <div class="form-group" style="margin-bottom: 0;">
+                         <label for="filter_stat_sel" class="form-label" style="margin-bottom: 0.25rem;">Status</label>
+-                        <select name="filter_status" id="filter_stat_sel" class="form-control" style="padding: 0.5rem;">
++                        <select name="filter_status" id="filter_stat_sel" class="form-control">
+                             <option value="">Semua Status</option>
+                             <option value="Pending" <?= $filter_status === 'Pending' ? 'selected' : '' ?>>Pending</option>
+                             <option value="On Progress" <?= $filter_status === 'On Progress' ? 'selected' : '' ?>>On Progress</option>
+@@ -350,7 +418,7 @@ require_once __DIR__ . '/../includes/header.php';
+                         </select>
+                     </div>
+                     
+-                    <button type="submit" class="btn btn-secondary" style="padding: 0.55rem; width: 100%;">Filter</button>
++                    <button type="submit" class="btn btn-secondary" style="width: 100%;">Filter</button>
+                 </form>
+             </div>
+         </div>
+@@ -361,7 +429,7 @@ require_once __DIR__ . '/../includes/header.php';
+                 <h3 class="card-section-title">Temuan Audit (Total: <?= count($findings_list) ?>)</h3>
+             </div>
+             <div class="table-responsive">
+-                <table>
++                <table class="table-wide">
+                     <thead>
+                         <tr>
+                             <th>No</th>
+@@ -398,14 +466,40 @@ require_once __DIR__ . '/../includes/header.php';
+                                         <?php endif; ?>
+                                     </td>
+                                     <td style="text-align: center;">
+-                                        <img src="<?= $base_path ?>uploads/<?= htmlspecialchars($f['finding_photo']) ?>" class="img-thumbnail" alt="Before">
++                                        <div style="display: flex; gap: 0.25rem; justify-content: center; flex-wrap: wrap; max-width: 130px; margin: 0 auto;">
++                                             <?php 
++                                             $bef_imgs = $finding_images[$f['id']]['before'] ?? [];
++                                             if (!empty($bef_imgs)): 
++                                                 foreach ($bef_imgs as $img_info):
++                                             ?>
++                                                <a href="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" target="_blank">
++                                                    <img src="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" class="img-thumbnail" style="width: 50px; height: 50px; object-fit: cover; margin: 2px;" alt="Before">
++                                                </a>
++                                             <?php 
++                                                 endforeach;
++                                             else:
++                                             ?>
++                                                 -
++                                             <?php endif; ?>
++                                        </div>
+                                     </td>
+                                     <td style="text-align: center;">
+-                                        <?php if ($f['improvement_photo']): ?>
+-                                            <img src="<?= $base_path ?>uploads/<?= htmlspecialchars($f['improvement_photo']) ?>" class="img-thumbnail" alt="After">
+-                                        <?php else: ?>
+-                                            <span style="color: var(--text-secondary); font-size: 0.8rem; font-style: italic;">Belum Ada</span>
+-                                        <?php endif; ?>
++                                        <div style="display: flex; gap: 0.25rem; justify-content: center; flex-wrap: wrap; max-width: 130px; margin: 0 auto;">
++                                             <?php 
++                                             $aft_imgs = $finding_images[$f['id']]['after'] ?? [];
++                                             if (!empty($aft_imgs)): 
++                                                 foreach ($aft_imgs as $img_info):
++                                             ?>
++                                                <a href="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" target="_blank">
++                                                    <img src="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" class="img-thumbnail" style="width: 50px; height: 50px; object-fit: cover; margin: 2px;" alt="After">
++                                                </a>
++                                             <?php 
++                                                 endforeach;
++                                             else:
++                                             ?>
++                                                 <span style="color: var(--text-secondary); font-size: 0.8rem; font-style: italic;">Belum Ada</span>
++                                             <?php endif; ?>
++                                        </div>
+                                     </td>
+                                     <td>
+                                         <?php if ($f['status'] === 'Done'): ?>
+@@ -420,8 +514,8 @@ require_once __DIR__ . '/../includes/header.php';
+                                     </td>
+                                     <td>
+                                         <div class="action-links" style="justify-content: center;">
+-                                            <a href="?edit=<?= $f['id'] ?><?= ($filter_area ? '&filter_area='.urlencode($filter_area) : '') ?><?= ($filter_division ? '&filter_division='.$filter_division : '') ?><?= ($filter_status ? '&filter_status='.$filter_status : '') ?>" class="action-link edit">Edit</a>
+-                                            <a href="?delete=<?= $f['id'] ?><?= ($filter_area ? '&filter_area='.urlencode($filter_area) : '') ?><?= ($filter_division ? '&filter_division='.$filter_division : '') ?><?= ($filter_status ? '&filter_status='.$filter_status : '') ?>" class="action-link delete">Hapus</a>
++                                            <a href="?edit=<?= $f['id'] ?><?= ($filter_area ? '&filter_area='.urlencode($filter_area) : '') ?><?= ($filter_division ? '&filter_division='.$filter_division : '') ?><?= ($filter_status ? '&filter_status='.$filter_status : '') ?>" class="action-link edit" title="Edit"><span class="material-symbols-rounded">edit</span></a>
++                                            <a href="?delete=<?= $f['id'] ?><?= ($filter_area ? '&filter_area='.urlencode($filter_area) : '') ?><?= ($filter_division ? '&filter_division='.$filter_division : '') ?><?= ($filter_status ? '&filter_status='.$filter_status : '') ?>" class="action-link delete" title="Hapus"><span class="material-symbols-rounded">delete</span></a>
+                                         </div>
+                                     </td>
+                                 </tr>
+@@ -432,76 +526,128 @@ require_once __DIR__ . '/../includes/header.php';
+             </div>
+         </div>
+     </div>
++</div>
+ 
+-    <!-- Form Add / Edit -->
+-    <div class="card-section" style="align-self: start;">
+-        <div class="card-section-header">
+-            <h3 class="card-section-title"><?= $edit_finding ? 'Edit Temuan Audit' : 'Tambah Temuan Audit Baru' ?></h3>
++<!-- Modal for Add/Edit Finding -->
++<div id="form-modal" class="modal">
++    <div class="modal-content modal-content-lg">
++        <div class="modal-header">
++            <h3 class="modal-title" id="modal-title-text"><?= $edit_finding ? 'Edit Temuan Audit' : 'Tambah Temuan Audit Baru' ?></h3>
++            <span class="modal-close" id="modal-close-btn">&times;</span>
+         </div>
+-        <div style="padding: 1.5rem;">
+-            <form action="findings.php" method="POST" enctype="multipart/form-data">
++        <div class="modal-body" style="max-height: 75vh; overflow-y: auto; padding-right: 0.5rem;">
++            <form action="findings.php" method="POST" enctype="multipart/form-data" id="modal-form">
+                 <input type="hidden" name="action" value="<?= $edit_finding ? 'edit' : 'add' ?>">
+                 <?php if ($edit_finding): ?>
+                     <input type="hidden" name="id" value="<?= $edit_finding['id'] ?>">
+                 <?php endif; ?>
+ 
+-                <div class="form-group">
+-                    <label for="division_id" class="form-label">Tanggung Jawab Divisi *</label>
+-                    <select name="division_id" id="division_id" class="form-control" required>
+-                        <option value="" disabled <?= !$edit_finding ? 'selected' : '' ?>>Pilih Divisi</option>
+-                        <?php foreach ($divisions as $d): ?>
+-                            <option value="<?= $d['id'] ?>" <?= ($edit_finding && $edit_finding['division_id'] == $d['id']) ? 'selected' : '' ?>><?= htmlspecialchars($d['name']) ?></option>
+-                        <?php endforeach; ?>
+-                    </select>
+-                </div>
+-
+-                <?php if ($edit_finding): ?>
+-                    <div class="form-group">
+-                        <label for="area_select" class="form-label">Area Audit *</label>
+-                        <select id="area_select" class="form-control" required>
+-                            <option value="" disabled selected>Pilih Divisi Terlebih Dahulu</option>
++                <div class="form-row-2">
++                    <div class="form-group" style="margin-bottom: 0;">
++                        <label for="division_id" class="form-label">Tanggung Jawab Divisi *</label>
++                        <select name="division_id" id="division_id" class="form-control" required>
++                            <option value="" disabled <?= !$edit_finding ? 'selected' : '' ?>>Pilih Divisi</option>
++                            <?php foreach ($divisions as $d): ?>
++                                <option value="<?= $d['id'] ?>" <?= ($edit_finding && $edit_finding['division_id'] == $d['id']) ? 'selected' : '' ?>><?= htmlspecialchars($d['name']) ?></option>
++                            <?php endforeach; ?>
+                         </select>
+                     </div>
+ 
+-                    <div class="form-group" id="manual_area_group" style="display: none;">
+-                        <label for="area" class="form-label">Nama Area Kustom (Ketik Manual) *</label>
+-                        <input type="text" name="area" id="area" class="form-control" placeholder="Contoh: Kantor lantai 1, Kantin bawah" value="<?= htmlspecialchars($edit_finding['area']) ?>">
++                    <div class="form-group" style="margin-bottom: 0;">
++                        <label for="pic" class="form-label">PIC Penanggung Jawab</label>
++                        <input type="text" name="pic" id="pic" class="form-control" placeholder="Nama PIC" value="<?= $edit_finding ? htmlspecialchars($edit_finding['pic']) : '' ?>">
+                     </div>
+-                <?php endif; ?>
+-
+-                <div class="form-group">
+-                    <label for="pic" class="form-label">PIC Penanggung Jawab</label>
+-                    <input type="text" name="pic" id="pic" class="form-control" placeholder="Nama PIC" value="<?= $edit_finding ? htmlspecialchars($edit_finding['pic']) : '' ?>">
+                 </div>
+ 
+-                <div class="form-group" style="margin-bottom: 1.5rem;">
+-                    <label for="due_date" class="form-label">Batas Waktu (Deadline)</label>
+-                    <input type="date" name="due_date" id="due_date" class="form-control" value="<?= $edit_finding ? htmlspecialchars($edit_finding['due_date']) : '' ?>">
++                <div class="form-row-2" style="margin-top: 1.25rem;">
++                    <div class="form-group" style="margin-bottom: 0;">
++                        <label for="due_date" class="form-label">Batas Waktu (Deadline)</label>
++                        <input type="date" name="due_date" id="due_date" class="form-control" value="<?= $edit_finding ? htmlspecialchars($edit_finding['due_date']) : '' ?>">
++                    </div>
++
++                    <?php if ($edit_finding): ?>
++                        <div class="form-group" style="margin-bottom: 0;">
++                            <label for="status" class="form-label">Status Temuan</label>
++                            <select name="status" id="status" class="form-control">
++                                <option value="Pending" <?= $edit_finding['status'] === 'Pending' ? 'selected' : '' ?>>Pending</option>
++                                <option value="On Progress" <?= $edit_finding['status'] === 'On Progress' ? 'selected' : '' ?>>On Progress</option>
++                                <option value="Done" <?= $edit_finding['status'] === 'Done' ? 'selected' : '' ?>>Done</option>
++                            </select>
++                        </div>
++                    <?php endif; ?>
+                 </div>
+ 
+                 <?php if ($edit_finding): ?>
+-                    <div class="form-group">
++                    <div class="form-row-2" style="margin-top: 1.25rem;">
++                        <div class="form-group" style="margin-bottom: 0;">
++                            <label for="area_select" class="form-label">Area Audit *</label>
++                            <select id="area_select" class="form-control" required>
++                                <option value="" disabled selected>Pilih Divisi Terlebih Dahulu</option>
++                            </select>
++                        </div>
++
++                        <div class="form-group" id="manual_area_group" style="display: none; margin-bottom: 0;">
++                            <label for="area" class="form-label">Nama Area Kustom (Ketik Manual) *</label>
++                            <input type="text" name="area" id="area" class="form-control" placeholder="Contoh: Kantor lantai 1, Kantin bawah" value="<?= htmlspecialchars($edit_finding['area']) ?>">
++                        </div>
++                    </div>
++
++                    <div class="form-group" style="margin-top: 1.25rem;">
+                         <label for="description" class="form-label">Deskripsi Catatan Temuan *</label>
+                         <textarea name="description" id="description" class="form-control" rows="4" placeholder="Tuliskan catatan detail temuan..." required><?= htmlspecialchars($edit_finding['description']) ?></textarea>
+                     </div>
+ 
+-                    <div class="form-group">
+-                        <label for="status" class="form-label">Status Temuan</label>
+-                        <select name="status" id="status" class="form-control">
+-                            <option value="Pending" <?= $edit_finding['status'] === 'Pending' ? 'selected' : '' ?>>Pending</option>
+-                            <option value="On Progress" <?= $edit_finding['status'] === 'On Progress' ? 'selected' : '' ?>>On Progress</option>
+-                            <option value="Done" <?= $edit_finding['status'] === 'Done' ? 'selected' : '' ?>>Done</option>
+-                        </select>
++                    <div class="form-group" style="margin-bottom: 1.5rem;">
++                        <label for="finding_photo" class="form-label">Unggah Foto Temuan Baru (Sebelum Perbaikan)</label>
++                        <input type="file" name="finding_photo[]" id="finding_photo" class="form-control" accept="image/*" multiple style="padding-top: 0.45rem;">
++                        <small style="display: block; color: var(--text-secondary); margin-top: 0.25rem; font-size: 0.75rem;">
++                            Bisa mengunggah lebih dari satu foto sekaligus.
++                        </small>
+                     </div>
+ 
+-                    <div class="form-group" style="margin-bottom: 2rem;">
+-                        <label for="finding_photo" class="form-label">Foto Temuan (Sebelum Perbaikan) <span style="font-weight: 300; font-size: 0.8rem; color: var(--text-secondary);">(Kosongkan jika tidak diganti)</span></label>
+-                        <input type="file" name="finding_photo" id="finding_photo" class="form-control" accept="image/*">
+-                        <div style="margin-top: 0.75rem;">
+-                            <span style="font-size: 0.8rem; color: var(--text-secondary);">Foto saat ini:</span><br>
+-                            <img src="<?= $base_path ?>uploads/<?= htmlspecialchars($edit_finding['finding_photo']) ?>" class="img-thumbnail" style="width: 100px; height: 100px; margin-top: 0.25rem;" alt="Current Finding">
++                    <?php
++                    // Fetch existing before photos for this finding
++                    $stmt_cur_imgs = $pdo->prepare("SELECT * FROM finding_images WHERE finding_id = :finding_id AND type = 'before'");
++                    $stmt_cur_imgs->execute(['finding_id' => $edit_finding['id']]);
++                    $cur_imgs = $stmt_cur_imgs->fetchAll();
++                    ?>
++                    <?php if (!empty($cur_imgs)): ?>
++                        <div class="form-group" style="margin-bottom: 2rem;">
++                            <label class="form-label" style="font-weight: 700; color: var(--text-primary);">Foto Sebelum Perbaikan Saat Ini (Centang untuk menghapus):</label>
++                            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem;">
++                                <?php foreach ($cur_imgs as $c_img): ?>
++                                    <div style="position: relative; width: 100px; text-align: center; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.25rem; background-color: rgba(255,255,255,0.02);">
++                                        <img src="<?= $base_path ?>view_image.php?id=<?= $c_img['id'] ?>" class="img-thumbnail" style="width: 80px; height: 80px; object-fit: cover; display: block; margin: 0 auto 0.25rem;" alt="Finding Photo">
++                                        <label style="font-size: 0.75rem; color: var(--danger); font-weight: 700; display: inline-flex; align-items: center; gap: 0.15rem; cursor: pointer;">
++                                            <input type="checkbox" name="delete_photo[]" value="<?= $c_img['id'] ?>"> Hapus
++                                        </label>
++                                    </div>
++                                <?php endforeach; ?>
++                            </div>
+                         </div>
+-                    </div>
++                    <?php endif; ?>
++
++                    <?php
++                    // Fetch existing after photos for this finding
++                    $stmt_cur_after = $pdo->prepare("SELECT * FROM finding_images WHERE finding_id = :finding_id AND type = 'after'");
++                    $stmt_cur_after->execute(['finding_id' => $edit_finding['id']]);
++                    $cur_after = $stmt_cur_after->fetchAll();
++                    ?>
++                    <?php if (!empty($cur_after)): ?>
++                        <div class="form-group" style="margin-bottom: 2rem;">
++                            <label class="form-label" style="font-weight: 700; color: var(--text-primary);">Foto Setelah Perbaikan Saat Ini (Centang untuk menghapus):</label>
++                            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem;">
++                                <?php foreach ($cur_after as $c_img): ?>
++                                    <div style="position: relative; width: 100px; text-align: center; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.25rem; background-color: rgba(255,255,255,0.02);">
++                                        <img src="<?= $base_path ?>view_image.php?id=<?= $c_img['id'] ?>" class="img-thumbnail" style="width: 80px; height: 80px; object-fit: cover; display: block; margin: 0 auto 0.25rem;" alt="Improvement Photo">
++                                        <label style="font-size: 0.75rem; color: var(--danger); font-weight: 700; display: inline-flex; align-items: center; gap: 0.15rem; cursor: pointer;">
++                                            <input type="checkbox" name="delete_photo[]" value="<?= $c_img['id'] ?>"> Hapus
++                                        </label>
++                                    </div>
++                                <?php endforeach; ?>
++                            </div>
++                        </div>
++                    <?php endif; ?>
+                 <?php else: ?>
+                     <!-- Add mode: Dynamic Multi-Item list -->
+                     <div id="findings-container">
+@@ -510,27 +656,29 @@ require_once __DIR__ . '/../includes/header.php';
+                                 Item Temuan #1
+                             </h4>
+                             
+-                            <div class="form-group">
+-                                <label class="form-label">Area Audit *</label>
+-                                <select class="form-control area-select-item" name="area[]" required>
+-                                    <option value="" disabled selected>Pilih Divisi Terlebih Dahulu</option>
+-                                </select>
++                            <div class="form-row-2">
++                                <div class="form-group" style="margin-bottom: 0;">
++                                    <label class="form-label">Area Audit *</label>
++                                    <select class="form-control area-select-item" name="area[]" required>
++                                        <option value="" disabled selected>Pilih Divisi Terlebih Dahulu</option>
++                                    </select>
++                                </div>
++
++                                <div class="form-group" style="margin-bottom: 0;">
++                                    <label class="form-label">Foto Temuan (Sebelum Perbaikan) *</label>
++                                    <input type="file" name="finding_photo_0[]" class="form-control" accept="image/*" multiple required style="padding-top: 0.45rem;">
++                                </div>
+                             </div>
+ 
+-                            <div class="form-group manual-area-group-item" style="display: none;">
++                            <div class="form-group manual-area-group-item" style="display: none; margin-top: 1.25rem; margin-bottom: 0;">
+                                 <label class="form-label">Nama Area Kustom (Ketik Manual) *</label>
+                                 <input type="text" class="form-control manual-area-input-item" placeholder="Contoh: Kantor lantai 1, Kantin bawah">
+                             </div>
+ 
+-                            <div class="form-group">
++                            <div class="form-group" style="margin-top: 1.25rem; margin-bottom: 0;">
+                                 <label class="form-label">Deskripsi Catatan Temuan *</label>
+                                 <textarea name="description[]" class="form-control" rows="3" placeholder="Tuliskan catatan detail temuan..." required></textarea>
+                             </div>
+-
+-                            <div class="form-group" style="margin-bottom: 0;">
+-                                <label class="form-label">Foto Temuan (Sebelum Perbaikan) *</label>
+-                                <input type="file" name="finding_photo[]" class="form-control" accept="image/*" required>
+-                            </div>
+                         </div>
+                     </div>
+                     
+@@ -543,14 +691,13 @@ require_once __DIR__ . '/../includes/header.php';
+                 <!-- Action buttons -->
+                 <div style="display: flex; gap: 0.75rem;">
+                     <button type="submit" class="btn btn-primary" style="flex: 1;"><?= $edit_finding ? 'Perbarui Temuan' : 'Daftarkan Temuan' ?></button>
+-                    <?php if ($edit_finding): ?>
+-                        <a href="findings.php" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center;">Batal</a>
+-                    <?php endif; ?>
++                    <button type="button" id="btn-cancel-form" class="btn btn-secondary" style="min-width: 100px;">Batal</button>
+                 </div>
+             </form>
+         </div>
+     </div>
+ </div>
++</div>
+ 
+ <script>
+ document.addEventListener('DOMContentLoaded', () => {
+@@ -558,6 +705,48 @@ document.addEventListener('DOMContentLoaded', () => {
+     const editFinding = <?= json_encode($edit_finding) ?>;
+     
+     const divisionSelect = document.getElementById('division_id');
++    const modal = document.getElementById('form-modal');
++    const btnTriggerAdd = document.getElementById('btn-trigger-add');
++    const btnCloseModal = document.getElementById('modal-close-btn');
++    const btnCancelForm = document.getElementById('btn-cancel-form');
++
++    // Automatically open modal in Edit Mode
++    if (editFinding && modal) {
++        modal.classList.add('active');
++    }
++
++    // Toggle modal show
++    if (btnTriggerAdd && modal) {
++        btnTriggerAdd.addEventListener('click', () => {
++            modal.classList.add('active');
++        });
++    }
++
++    // Toggle modal close handlers
++    function closeModal() {
++        if (editFinding) {
++            window.location.href = 'findings.php';
++        } else if (modal) {
++            modal.classList.remove('active');
++        }
++    }
++
++    if (btnCloseModal) {
++        btnCloseModal.addEventListener('click', closeModal);
++    }
++    if (btnCancelForm) {
++        btnCancelForm.addEventListener('click', (e) => {
++            e.preventDefault();
++            closeModal();
++        });
++    }
++    if (modal) {
++        modal.addEventListener('click', (e) => {
++            if (e.target === modal) {
++                closeModal();
++            }
++        });
++    }
+ 
+     function populateAreaSelect(selectElement, divisionId, selectedAreaName = '') {
+         selectElement.innerHTML = '';
+@@ -687,27 +876,29 @@ document.addEventListener('DOMContentLoaded', () => {
+                         </button>
+                     </h4>
+                     
+-                    <div class="form-group">
+-                        <label class="form-label">Area Audit *</label>
+-                        <select class="form-control area-select-item" name="area[]" required>
+-                            <!-- populated dynamically -->
+-                        </select>
++                    <div class="form-row-2">
++                        <div class="form-group" style="margin-bottom: 0;">
++                            <label class="form-label">Area Audit *</label>
++                            <select class="form-control area-select-item" name="area[]" required>
++                                <!-- populated dynamically -->
++                            </select>
++                        </div>
++
++                        <div class="form-group" style="margin-bottom: 0;">
++                            <label class="form-label">Foto Temuan (Sebelum Perbaikan) *</label>
++                            <input type="file" name="finding_photo_${itemIndex-1}[]" class="form-control" accept="image/*" multiple required style="padding-top: 0.45rem;">
++                        </div>
+                     </div>
+ 
+-                    <div class="form-group manual-area-group-item" style="display: none;">
++                    <div class="form-group manual-area-group-item" style="display: none; margin-top: 1.25rem; margin-bottom: 0;">
+                         <label class="form-label">Nama Area Kustom (Ketik Manual) *</label>
+                         <input type="text" class="form-control manual-area-input-item" placeholder="Contoh: Kantor lantai 1, Kantin bawah">
+                     </div>
+ 
+-                    <div class="form-group">
++                    <div class="form-group" style="margin-top: 1.25rem; margin-bottom: 0;">
+                         <label class="form-label">Deskripsi Catatan Temuan *</label>
+                         <textarea name="description[]" class="form-control" rows="3" placeholder="Tuliskan catatan detail temuan..." required></textarea>
+                     </div>
+-
+-                    <div class="form-group" style="margin-bottom: 0;">
+-                        <label class="form-label">Foto Temuan (Sebelum Perbaikan) *</label>
+-                        <input type="file" name="finding_photo[]" class="form-control" accept="image/*" required>
+-                    </div>
+                 </div>
+             `;
+             const div = document.createElement('div');
+@@ -752,6 +943,11 @@ document.addEventListener('DOMContentLoaded', () => {
+                     </button>
+                 `;
+             }
++            // Update name of the file input to remain correct index-based name
++            const fileInput = card.querySelector('input[type="file"]');
++            if (fileInput) {
++                fileInput.setAttribute('name', `finding_photo_${idx}[]`);
++            }
+         });
+     }
+ });

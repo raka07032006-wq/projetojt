@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Masuk - Monitoring Audit 5R</title>
+    <link rel="icon" type="image/png" href="assets/images/logo_5r.png?v=2">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="auth-wrapper">
@@ -67,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     <div class="auth-card">
         <div class="auth-header">
-            <div class="auth-logo">5R</div>
+            <img src="assets/images/logo_5r.png?v=2" alt="5R Logo" class="auth-logo">
             <h1 class="auth-title">Audit 5R HRGA</h1>
             <p class="auth-subtitle">Sistem Monitoring & Tindakan Perbaikan</p>
         </div>

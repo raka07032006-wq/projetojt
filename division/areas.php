@@ -69,7 +69,7 @@ require_once __DIR__ . '/../includes/header.php';
     <form method="GET" action="areas.php" style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0;">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <label for="bulan" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">Pilih Bulan Evaluasi:</label>
-            <select name="bulan" id="bulan" class="form-control" style="width: 160px; padding: 0.45rem 0.75rem;" onchange="this.form.submit()">
+            <select name="bulan" id="bulan" class="form-control form-control-sm" style="width: 160px;" onchange="this.form.submit()">
                 <?php
                 $bulan_names = [
                     1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -85,7 +85,7 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <label for="tahun" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">Tahun:</label>
-            <select name="tahun" id="tahun" class="form-control" style="width: 110px; padding: 0.45rem 0.75rem;" onchange="this.form.submit()">
+            <select name="tahun" id="tahun" class="form-control form-control-sm" style="width: 110px;" onchange="this.form.submit()">
                 <?php
                 for ($y = 2025; $y <= 2030; $y++) {
                     $selected = ($y == $selected_year) ? 'selected' : '';
@@ -94,10 +94,12 @@ require_once __DIR__ . '/../includes/header.php';
                 ?>
             </select>
         </div>
-        <div style="margin-left: 1.5rem;">
-            <a href="../print_report.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&division_id=<?= $division_id ?>" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; border-radius: 4px; font-weight: 600; color: white;">
-                <span class="material-symbols-rounded" style="font-size: 1.15rem;">print</span>
-                Cetak Laporan
+        <div style="margin-left: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
+            <a href="../print_report.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&division_id=<?= $division_id ?>" target="_blank" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: var(--radius-sm); text-decoration: none; color: white;" title="Cetak Laporan">
+                <span class="material-symbols-rounded" style="font-size: 1.25rem;">print</span>
+            </a>
+            <a href="../export_excel.php?bulan=<?= $selected_month ?>&tahun=<?= $selected_year ?>&division_id=<?= $division_id ?>" class="btn btn-sm" style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: var(--radius-sm); text-decoration: none; color: white; background-color: var(--success);" title="Ekspor Excel">
+                <span class="material-symbols-rounded" style="font-size: 1.25rem;">grid_on</span>
             </a>
         </div>
         <div style="margin-left: auto; font-size: 0.85rem; color: var(--text-secondary);">

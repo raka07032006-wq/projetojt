@@ -76,8 +76,15 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Bulanan Audit 5R - <?= htmlspecialchars($report_title_name) ?> - <?= htmlspecialchars($bulan_names[$bulan]) ?> <?= $tahun ?></title>
+    <link rel="icon" type="image/png" href="<?= $base_path ?>assets/images/logo_5r.png?v=2">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Local html2pdf.js bundle for offline auto-download capability -->
+    <script src="assets/js/html2pdf.bundle.min.js"></script>
     <style>
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
+
         :root {
             --primary: #0f172a;
             --border-color: #334155;
@@ -212,9 +219,9 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
             display: block;
         }
 
-        .detail-section {
-            margin-top: 25px;
-            page-break-inside: avoid;
+        tr, img, .top-grids, .findings-flex-row {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
 
         .area-title {
@@ -223,6 +230,8 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
             margin: 20px 0 8px 0;
             border-bottom: 1.5px solid #000000;
             padding-bottom: 4px;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
         }
 
         .findings-table th {
@@ -240,8 +249,211 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
 
         .page-break {
             display: block;
-            margin: 40px 0;
-            border-top: 1px dashed #cbd5e1;
+            page-break-before: always !important;
+            break-before: always !important;
+            margin: 0;
+            border-top: none;
+            height: 0;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 15px;
+        }
+
+        /* Flex Table Styles for Findings */
+        .findings-flex-table {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            border: 1px solid #000000;
+            margin-bottom: 20px;
+            font-size: 10px;
+        }
+
+        .findings-flex-header {
+            display: flex;
+            background-color: #22c55e;
+            color: #ffffff;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+
+        .findings-flex-row {
+            display: flex;
+            border-top: 1px solid #000000;
+            background: #ffffff;
+        }
+
+        .findings-flex-header > div,
+        .findings-flex-row > div {
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .col-no {
+            width: 35px;
+            justify-content: center !important;
+            border-right: 1px solid #000000;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+
+        .col-desc {
+            flex: 1;
+            border-right: 1px solid #000000;
+            align-items: center !important;
+            word-break: break-word;
+        }
+
+        .col-photo {
+            width: 180px;
+            justify-content: center !important;
+            flex-shrink: 0;
+            text-align: center;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 4px;
+            padding: 8px 4px !important;
+        }
+
+        .col-photo:first-of-type {
+            border-right: 1px solid #000000;
+        }
+
+        .col-photo img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border: 1px solid #000000;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        /* PDF lock styles to ensure consistent design width on all devices during PDF render */
+        body.pdf-mode {
+            width: 720px !important;
+            min-width: 720px !important;
+            padding: 10px !important;
+            background: #ffffff !important;
+        }
+        body.pdf-mode .no-print-bar {
+            display: none !important;
+        }
+        body.pdf-mode .top-grids {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 15px !important;
+        }
+        body.pdf-mode .left-table-container {
+            flex: 1 !important;
+            overflow-x: visible !important;
+        }
+        body.pdf-mode .right-table-container {
+            width: 220px !important;
+            overflow-x: visible !important;
+        }
+        body.pdf-mode .table-responsive {
+            overflow-x: visible !important;
+        }
+
+        /* Responsive styles for mobile preview */
+        @media screen and (max-width: 768px) {
+            body:not(.pdf-mode) {
+                padding: 10px;
+            }
+            body:not(.pdf-mode) .no-print-bar {
+                margin: -10px -10px 20px -10px;
+                padding: 12px 16px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            body:not(.pdf-mode) .no-print-bar > div {
+                width: 100%;
+            }
+            body:not(.pdf-mode) .top-grids {
+                flex-direction: column;
+                gap: 20px;
+            }
+            body:not(.pdf-mode) .right-table-container {
+                width: 100%;
+            }
+            body:not(.pdf-mode) .left-table-container,
+            body:not(.pdf-mode) .right-table-container {
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Mobile findings table layout override */
+            body:not(.pdf-mode) .findings-flex-header {
+                display: none !important;
+            }
+            body:not(.pdf-mode) .findings-flex-row {
+                display: block !important;
+                padding: 16px !important;
+                border-top: 1px solid var(--border-color) !important;
+                background-color: rgba(255, 255, 255, 0.01);
+            }
+            body:not(.pdf-mode) .findings-flex-row > div {
+                padding: 0 !important;
+                border: none !important;
+            }
+            body:not(.pdf-mode) .findings-flex-row .col-no {
+                font-size: 1rem !important;
+                font-weight: 800 !important;
+                color: var(--accent) !important;
+                display: inline !important;
+                margin-right: 6px !important;
+            }
+            body:not(.pdf-mode) .findings-flex-row .col-desc {
+                font-size: 0.95rem !important;
+                line-height: 1.4 !important;
+                color: var(--text-primary) !important;
+                display: inline !important;
+            }
+            body:not(.pdf-mode) .findings-flex-row .col-photo {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+                margin-top: 12px !important;
+                margin-bottom: 8px !important;
+                width: 100% !important;
+                justify-content: flex-start !important;
+            }
+            body:not(.pdf-mode) .findings-flex-row .col-photo img {
+                width: 75px !important;
+                height: 75px !important;
+                margin: 0 !important;
+            }
+            body:not(.pdf-mode) .findings-flex-row .col-photo:nth-child(3)::before {
+                content: "Foto Sebelum:";
+                display: block !important;
+                width: 100% !important;
+                font-weight: 700 !important;
+                font-size: 0.75rem !important;
+                color: var(--text-secondary) !important;
+                margin-bottom: 4px !important;
+                text-transform: uppercase !important;
+            }
+            body:not(.pdf-mode) .findings-flex-row .col-photo:nth-child(4)::before {
+                content: "Foto Sesudah:";
+                display: block !important;
+                width: 100% !important;
+                font-weight: 700 !important;
+                font-size: 0.75rem !important;
+                color: var(--text-secondary) !important;
+                margin-bottom: 4px !important;
+                text-transform: uppercase !important;
+            }
         }
 
         /* Hide elements on print */
@@ -269,6 +481,15 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
                 border-top: none;
             }
         }
+        
+        /* Loading spinner for mobile PDF generation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body>
@@ -278,10 +499,14 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
         <div>
             <strong style="font-size: 14px;">Laporan Audit 5R - Mode Cetak</strong>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; align-items: center;">
             <button onclick="window.print()" class="btn">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Cetak Laporan
+            </button>
+            <button id="btn-download-pdf" class="btn" style="background-color: #ef4444; border: none; color: white;">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Unduh PDF
             </button>
             <button onclick="window.close()" class="btn btn-secondary">Tutup Tab</button>
         </div>
@@ -329,7 +554,7 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
         $findings_by_area = [];
         if (!$is_all_divisions) {
             $stmt_findings = $pdo->prepare("
-                SELECT id, area, description, finding_photo, improvement_photo, created_at 
+                SELECT id, area, description, created_at 
                 FROM findings 
                 WHERE division_id = :div_id AND MONTH(created_at) = :bulan AND YEAR(created_at) = :tahun
                 ORDER BY id ASC
@@ -341,13 +566,27 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
             ]);
             $all_findings = $stmt_findings->fetchAll();
 
+            // Batch fetch finding images
+            $finding_ids = array_column($all_findings, 'id');
+            $finding_images = [];
+            if (!empty($finding_ids)) {
+                $in_clause = implode(',', array_fill(0, count($finding_ids), '?'));
+                $stmt_imgs = $pdo->prepare("SELECT id, finding_id, type, image_path FROM finding_images WHERE finding_id IN ($in_clause) ORDER BY id ASC");
+                $stmt_imgs->execute($finding_ids);
+                foreach ($stmt_imgs->fetchAll() as $img) {
+                    $finding_images[$img['finding_id']][$img['type']][] = [
+                        'id' => $img['id'],
+                        'path' => $img['image_path']
+                    ];
+                }
+            }
+
             // Group findings by area name for display
             foreach ($all_findings as $finding) {
                 $area_key = strtolower(trim($finding['area']));
                 $findings_by_area[$area_key][] = [
+                    'id' => $finding['id'],
                     'description' => $finding['description'],
-                    'finding_photo' => $finding['finding_photo'],
-                    'improvement_photo' => $finding['improvement_photo'],
                     'area' => $finding['area']
                 ];
             }
@@ -445,6 +684,9 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
 
         <!-- Bottom Section: Findings/Notes Details Per Area -->
         <?php if (!empty($all_findings)): ?>
+            <!-- Force page break before findings section to keep Summary on Page 1 -->
+            <div class="page-break"></div>
+            
             <div style="margin-top: 30px;">
                 <h2 style="font-size: 14px; font-weight: 800; border-bottom: 2px solid #000000; padding-bottom: 5px; margin-bottom: 15px; text-transform: uppercase;">Detail Catatan Temuan Per Area (<?= htmlspecialchars($display_div_name) ?>)</h2>
                 
@@ -459,40 +701,51 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
                         continue;
                     }
                 ?>
-                    <div class="detail-section" style="page-break-inside: avoid;">
+                    <div class="detail-section">
                         <div class="area-title"><?= $i++ ?>. <?= htmlspecialchars($area['name']) ?></div>
-                        <table class="findings-table">
-                            <thead>
-                                <tr>
-                                    <th class="green-header center" style="width: 40px;">No.</th>
-                                    <th class="green-header">Catatan Temuan (<?= htmlspecialchars($bulan_names[$bulan]) ?> <?= $tahun ?>)</th>
-                                    <th class="green-header center" style="width: 110px;">Foto Sebelum</th>
-                                    <th class="green-header center" style="width: 110px;">Foto Sesudah</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php $f_no = 1; foreach ($area_findings as $item): ?>
-                                    <tr>
-                                        <td class="center"><?= $f_no++ ?>.</td>
-                                        <td><?= htmlspecialchars($item['description']) ?></td>
-                                        <td class="center">
-                                            <?php if ($item['finding_photo']): ?>
-                                                <img src="<?= $base_path ?>uploads/<?= htmlspecialchars($item['finding_photo']) ?>" style="width: 90px; height: 90px; object-fit: cover; border: 1px solid #000000; border-radius: 4px; display: block; margin: 0 auto;" alt="Sebelum">
-                                            <?php else: ?>
-                                                -
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="center">
-                                            <?php if ($item['improvement_photo']): ?>
-                                                <img src="<?= $base_path ?>uploads/<?= htmlspecialchars($item['improvement_photo']) ?>" style="width: 90px; height: 90px; object-fit: cover; border: 1px solid #000000; border-radius: 4px; display: block; margin: 0 auto;" alt="Sesudah">
-                                            <?php else: ?>
-                                                <span style="color: var(--text-secondary); font-style: italic; font-size: 9px;">Belum Ada</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                        <div class="findings-flex-table">
+                            <div class="findings-flex-header">
+                                <div class="col-no">No.</div>
+                                <div class="col-desc">Catatan Temuan (<?= htmlspecialchars($bulan_names[$bulan]) ?> <?= $tahun ?>)</div>
+                                <div class="col-photo">Foto Sebelum</div>
+                                <div class="col-photo">Foto Sesudah</div>
+                            </div>
+                            
+                            <?php $f_no = 1; foreach ($area_findings as $item): ?>
+                                <div class="findings-flex-row">
+                                    <div class="col-no"><?= $f_no++ ?>.</div>
+                                    <div class="col-desc"><?= htmlspecialchars($item['description']) ?></div>
+                                    <div class="col-photo">
+                                        <?php 
+                                        $bef_imgs = $finding_images[$item['id']]['before'] ?? [];
+                                        if (!empty($bef_imgs)): 
+                                            foreach ($bef_imgs as $img_info):
+                                        ?>
+                                            <img src="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" alt="Sebelum">
+                                        <?php 
+                                            endforeach;
+                                        else:
+                                        ?>
+                                            -
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="col-photo">
+                                        <?php 
+                                        $aft_imgs = $finding_images[$item['id']]['after'] ?? [];
+                                        if (!empty($aft_imgs)): 
+                                            foreach ($aft_imgs as $img_info):
+                                        ?>
+                                            <img src="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" alt="Sesudah">
+                                        <?php 
+                                            endforeach;
+                                        else:
+                                        ?>
+                                            <span style="color: var(--text-secondary); font-style: italic; font-size: 9px;">Belum Ada</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
 
@@ -504,45 +757,171 @@ if (!$is_all_divisions && !empty($divisions_to_print)) {
                     }
                     $area_name = $area_findings[0]['area'] ?? ucwords($area_key);
                 ?>
-                    <div class="detail-section" style="page-break-inside: avoid;">
+                    <div class="detail-section">
                         <div class="area-title"><?= $i++ ?>. <?= htmlspecialchars($area_name) ?> <span style="font-size: 10px; color: var(--text-secondary); font-weight: normal;">(Area Kustom)</span></div>
-                        <table class="findings-table">
-                            <thead>
-                                <tr>
-                                    <th class="green-header center" style="width: 40px;">No.</th>
-                                    <th class="green-header">Catatan Temuan (<?= htmlspecialchars($bulan_names[$bulan]) ?> <?= $tahun ?>)</th>
-                                    <th class="green-header center" style="width: 110px;">Foto Sebelum</th>
-                                    <th class="green-header center" style="width: 110px;">Foto Sesudah</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php $f_no = 1; foreach ($area_findings as $item): ?>
-                                    <tr>
-                                        <td class="center"><?= $f_no++ ?>.</td>
-                                        <td><?= htmlspecialchars($item['description']) ?></td>
-                                        <td class="center">
-                                            <?php if ($item['finding_photo']): ?>
-                                                <img src="<?= $base_path ?>uploads/<?= htmlspecialchars($item['finding_photo']) ?>" style="width: 90px; height: 90px; object-fit: cover; border: 1px solid #000000; border-radius: 4px; display: block; margin: 0 auto;" alt="Sebelum">
-                                            <?php else: ?>
-                                                -
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="center">
-                                            <?php if ($item['improvement_photo']): ?>
-                                                <img src="<?= $base_path ?>uploads/<?= htmlspecialchars($item['improvement_photo']) ?>" style="width: 90px; height: 90px; object-fit: cover; border: 1px solid #000000; border-radius: 4px; display: block; margin: 0 auto;" alt="Sesudah">
-                                            <?php else: ?>
-                                                <span style="color: var(--text-secondary); font-style: italic; font-size: 9px;">Belum Ada</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                        <div class="findings-flex-table">
+                            <div class="findings-flex-header">
+                                <div class="col-no">No.</div>
+                                <div class="col-desc">Catatan Temuan (<?= htmlspecialchars($bulan_names[$bulan]) ?> <?= $tahun ?>)</div>
+                                <div class="col-photo">Foto Sebelum</div>
+                                <div class="col-photo">Foto Sesudah</div>
+                            </div>
+                            
+                            <?php $f_no = 1; foreach ($area_findings as $item): ?>
+                                <div class="findings-flex-row">
+                                    <div class="col-no"><?= $f_no++ ?>.</div>
+                                    <div class="col-desc"><?= htmlspecialchars($item['description']) ?></div>
+                                    <div class="col-photo">
+                                        <?php 
+                                        $bef_imgs = $finding_images[$item['id']]['before'] ?? [];
+                                        if (!empty($bef_imgs)): 
+                                            foreach ($bef_imgs as $img_info):
+                                        ?>
+                                            <img src="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" alt="Sebelum">
+                                        <?php 
+                                            endforeach;
+                                        else:
+                                        ?>
+                                            -
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="col-photo">
+                                        <?php 
+                                        $aft_imgs = $finding_images[$item['id']]['after'] ?? [];
+                                        if (!empty($aft_imgs)): 
+                                            foreach ($aft_imgs as $img_info):
+                                        ?>
+                                            <img src="<?= $base_path ?>view_image.php?id=<?= $img_info['id'] ?>" alt="Sesudah">
+                                        <?php 
+                                            endforeach;
+                                        else:
+                                        ?>
+                                            <span style="color: var(--text-secondary); font-style: italic; font-size: 9px;">Belum Ada</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
     <?php endforeach; ?>
 
+    <script>
+        // Setup PDF download handlers and auto-trigger if requested
+        window.addEventListener('DOMContentLoaded', () => {
+            const noPrintBar = document.querySelector('.no-print-bar');
+            
+            const generatePDF = (autoClose = false) => {
+                // Lock design width for consistent high quality render
+                document.body.classList.add('pdf-mode');
+                if (noPrintBar) {
+                    noPrintBar.style.display = 'none';
+                }
+                
+                const element = document.body;
+                const cleanFilename = document.title
+                    .replace(/\s+/g, '_')
+                    .replace(/[^a-zA-Z0-9_\-]/g, '') + '.pdf';
+                const opt = {
+                    margin:       [10, 10, 10, 10],
+                    filename:     cleanFilename,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true, logging: false, windowWidth: 720 },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak:    { mode: ['css', 'legacy'] }
+                };
+                
+                return html2pdf().set(opt).from(element).save().then(() => {
+                    if (autoClose) {
+                        setTimeout(() => {
+                            window.close();
+                        }, 1000);
+                    } else {
+                        // Restore UI
+                        document.body.classList.remove('pdf-mode');
+                        if (noPrintBar) {
+                            noPrintBar.style.display = '';
+                        }
+                        alert("Unduhan PDF laporan telah dimulai!");
+                    }
+                }).catch(err => {
+                    console.error("PDF generation failed: ", err);
+                    // Restore UI on error
+                    document.body.classList.remove('pdf-mode');
+                    if (noPrintBar) {
+                        noPrintBar.style.display = '';
+                    }
+                    alert("Gagal mengunduh PDF: " + err.message);
+                });
+            };
+
+            // Set up listener for the standard action bar button
+            const btnDownload = document.getElementById('btn-download-pdf');
+            if (btnDownload) {
+                btnDownload.addEventListener('click', () => {
+                    btnDownload.disabled = true;
+                    btnDownload.innerHTML = `
+                        <svg class="animate-spin" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; display: inline-block; vertical-align: middle; animation: spin 1s linear infinite;"><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        Memproses...
+                    `;
+                    generatePDF(false).finally(() => {
+                        btnDownload.disabled = false;
+                        btnDownload.innerHTML = `
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Unduh PDF
+                        `;
+                    });
+                });
+            }
+
+            // Detect URL parameter pdf=true
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('pdf') === 'true') {
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (!isMobile) {
+                    // Desktop auto-trigger
+                    setTimeout(() => {
+                        generatePDF(true);
+                    }, 1500);
+                } else {
+                    // Mobile auto-trigger override (to avoid browser download blocks on load)
+                    if (noPrintBar) {
+                        noPrintBar.innerHTML = `
+                            <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left;">
+                                <strong style="font-size: 13px; color: #ffffff;">Laporan PDF Siap Diunduh</strong>
+                                <span style="font-size: 10px; color: #94a3b8;">Ketuk tombol di bawah untuk mengunduh laporan PDF di HP Anda.</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 8px;">
+                                <button id="btn-download-pdf-mobile" class="btn" style="background-color: #ef4444; flex: 1; justify-content: center; height: 38px; font-size: 12px; color: white; border: none;">
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    Unduh PDF Laporan
+                                </button>
+                                <button onclick="window.close()" class="btn btn-secondary" style="height: 38px; font-size: 12px; color: white; padding: 0 12px;">Tutup</button>
+                            </div>
+                        `;
+                        
+                        document.getElementById('btn-download-pdf-mobile').addEventListener('click', () => {
+                            const btn = document.getElementById('btn-download-pdf-mobile');
+                            btn.disabled = true;
+                            btn.innerHTML = `
+                                <svg class="animate-spin" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; display: inline-block; vertical-align: middle; animation: spin 1s linear infinite;"><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                Memproses PDF...
+                            `;
+                            generatePDF(false).finally(() => {
+                                btn.disabled = false;
+                                btn.innerHTML = `
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    Unduh PDF Laporan
+                                `;
+                            });
+                        });
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>

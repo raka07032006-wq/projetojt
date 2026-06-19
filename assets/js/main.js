@@ -32,14 +32,35 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // Add click listener to all checkable images
+        // Add click listener via delegation to prevent navigation and open preview modal
+        document.addEventListener('click', (e) => {
+            const img = e.target.closest('.img-thumbnail, .comparison-img');
+            const link = e.target.closest('a[href*="view_image.php"]');
+            
+            if (img || link) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const previewImg = document.getElementById('modalPreviewImg');
+                let src = '';
+                
+                if (link) {
+                    src = link.href;
+                } else if (img) {
+                    const parentLink = img.closest('a');
+                    src = parentLink ? parentLink.href : img.src;
+                }
+                
+                if (previewImg && src) {
+                    previewImg.src = src;
+                    modal.classList.add('active');
+                }
+            }
+        });
+        
+        // Ensure cursor styling is applied on load
         images.forEach(img => {
             img.style.cursor = 'pointer';
-            img.addEventListener('click', () => {
-                const previewImg = document.getElementById('modalPreviewImg');
-                previewImg.src = img.src;
-                modal.classList.add('active');
-            });
         });
     }
 
@@ -162,13 +183,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.querySelector('.sidebar');
     const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+    if (mobileMenuBtn && sidebar) {
+        mobileMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sidebar.classList.add('active');
+            if (sidebarBackdrop) sidebarBackdrop.classList.add('active');
+        });
+    }
 
     // Synchronize UI icon state on load
     if (sidebarToggle) {
         const icon = sidebarToggle.querySelector('.material-symbols-rounded');
         if (icon) {
             const isCollapsed = document.body.classList.contains('collapsed');
-            icon.textContent = isCollapsed ? 'left_panel_open' : 'left_panel_close';
+            icon.textContent = isCollapsed ? 'chevron_right' : 'chevron_left';
         }
     }
 
@@ -187,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Update icon dynamically
                 const icon = sidebarToggle.querySelector('.material-symbols-rounded');
                 if (icon) {
-                    icon.textContent = isCollapsed ? 'left_panel_open' : 'left_panel_close';
+                    icon.textContent = isCollapsed ? 'chevron_right' : 'chevron_left';
                 }
             }
         });

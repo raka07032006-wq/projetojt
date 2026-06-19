@@ -4,10 +4,12 @@ USE `audit_5r`;
 
 -- Drop existing tables to ensure schema changes are applied
 DROP TABLE IF EXISTS `notifications`;
+DROP TABLE IF EXISTS `finding_images`;
 DROP TABLE IF EXISTS `findings`;
 DROP TABLE IF EXISTS `users`;
-DROP TABLE IF EXISTS `divisions`;
+DROP TABLE IF EXISTS `area_evaluations`;
 DROP TABLE IF EXISTS `areas`;
+DROP TABLE IF EXISTS `divisions`;
 
 -- Table for Divisions (8 specific divisions)
 CREATE TABLE IF NOT EXISTS `divisions` (
@@ -24,6 +26,18 @@ CREATE TABLE IF NOT EXISTS `areas` (
   `name` VARCHAR(150) NOT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`division_id`) REFERENCES `divisions`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Table for Area Evaluations (Nilai 5R per Bulan/Tahun)
+CREATE TABLE IF NOT EXISTS `area_evaluations` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `area_id` INT NOT NULL,
+  `bulan` TINYINT NOT NULL CHECK (`bulan` BETWEEN 1 AND 12),
+  `tahun` INT NOT NULL,
+  `nilai_5r` DECIMAL(3,2) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`area_id`) REFERENCES `areas`(`id`) ON DELETE CASCADE,
+  UNIQUE KEY `unique_area_month_year` (`area_id`, `bulan`, `tahun`)
 ) ENGINE=InnoDB;
 
 
@@ -49,13 +63,21 @@ CREATE TABLE IF NOT EXISTS `findings` (
   `description` TEXT NOT NULL,
   `pic` VARCHAR(100) DEFAULT NULL,
   `status` ENUM('Pending', 'On Progress', 'Done') NOT NULL DEFAULT 'On Progress',
-  `finding_photo` VARCHAR(255) NOT NULL,
-  `improvement_photo` VARCHAR(255) DEFAULT NULL,
   `improvement_description` TEXT DEFAULT NULL,
   `due_date` DATE DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`division_id`) REFERENCES `divisions`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Table for Finding Images
+CREATE TABLE IF NOT EXISTS `finding_images` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `finding_id` INT NOT NULL,
+  `image_path` VARCHAR(255) NOT NULL,
+  `type` ENUM('before', 'after') NOT NULL DEFAULT 'before',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`finding_id`) REFERENCES `findings`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- Seed default divisions (8 divisions from user request)

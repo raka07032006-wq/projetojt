@@ -67,12 +67,13 @@ if ($is_logged_in) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aplikasi Monitoring Audit 5R</title>
+    <link rel="icon" type="image/png" href="<?= $base_path ?>assets/images/logo_5r.png?v=2">
     <!-- CSS stylesheet -->
-    <link rel="stylesheet" href="<?= $base_path ?>assets/css/style.css">
+    <link rel="stylesheet" href="<?= $base_path ?>assets/css/style.css?v=<?= time() ?>">
     <!-- Google Material Symbols Rounded -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0">
     <!-- Main JS file -->
-    <script src="<?= $base_path ?>assets/js/main.js" defer></script>
+    <script src="<?= $base_path ?>assets/js/main.js?v=<?= time() ?>" defer></script>
 </head>
 <body>
     <script>
@@ -90,7 +91,7 @@ if ($is_logged_in) {
             <aside class="sidebar">
                 <div class="sidebar-brand">
                     <a href="<?= $base_path ?>dashboard.php" class="logo-link">
-                        <div class="logo-icon">5R</div>
+                        <img src="<?= $base_path ?>assets/images/logo_5r.png?v=2" alt="5R Logo" class="logo-icon">
                         <span class="logo-text">Audit 5R</span>
                     </a>
                 </div>
@@ -119,7 +120,7 @@ if ($is_logged_in) {
                             <span class="link-text">Kelola User Akses</span>
                         </a>
                     <?php elseif ($user_role === 'division'): ?>
-                        <a href="<?= $base_path ?>division/dashboard.php" class="sidebar-link <?= ($is_division_path && ($current_page === 'dashboard.php' || $current_page === 'improve.php')) ? 'active' : '' ?>">
+                        <a href="<?= $base_path ?>division/dashboard.php" class="sidebar-link <?= ($is_division_path && $current_page === 'dashboard.php') ? 'active' : '' ?>">
                             <span class="material-symbols-rounded">dashboard</span>
                             <span class="link-text">Dashboard Divisi</span>
                         </a>
@@ -167,12 +168,6 @@ if ($is_logged_in) {
                         </div>
                     </a>
                     
-                    <!-- Sidebar Toggle Button -->
-                    <button type="button" class="sidebar-toggle-btn" id="sidebarToggle" aria-label="Toggle Sidebar">
-                        <span class="material-symbols-rounded">left_panel_close</span>
-                        <span class="link-text">Sembunyikan Menu</span>
-                    </button>
-                    
                     <!-- Logout Button -->
                     <a href="<?= $base_path ?>logout.php" class="sidebar-logout">
                         <span class="material-symbols-rounded">logout</span>
@@ -180,6 +175,11 @@ if ($is_logged_in) {
                     </a>
                 </div>
             </aside>
+
+            <!-- Sidebar Toggle Button (Desktop Only Floating Circular Button) -->
+            <button type="button" class="sidebar-toggle-btn-floating" id="sidebarToggle" aria-label="Toggle Sidebar">
+                <span class="material-symbols-rounded">chevron_left</span>
+            </button>
         <?php endif; ?>
         
         <!-- Main Content Area wrapper -->
@@ -188,7 +188,9 @@ if ($is_logged_in) {
             <?php if ($is_logged_in): ?>
                 <div class="main-topbar">
                     <div class="topbar-left">
-                        <!-- Topbar left spacer -->
+                        <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Buka Menu">
+                            <span class="material-symbols-rounded">menu</span>
+                        </button>
                     </div>
                     <div class="topbar-right">
                         <!-- Notification Bell -->

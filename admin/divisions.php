@@ -97,6 +97,12 @@ require_once __DIR__ . '/../includes/header.php';
         <h1 class="page-title">Kelola Divisi</h1>
         <p class="page-subtitle">Atur daftar divisi/bagian yang melakukan monitoring audit 5R</p>
     </div>
+    <div>
+        <button type="button" id="btn-trigger-add" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-symbols-rounded">add</span>
+            Tambah Divisi
+        </button>
+    </div>
 </div>
 
 <?php if (!empty($success)): ?>
@@ -107,7 +113,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<div class="layout-grid">
+<div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
     <!-- List of Divisions -->
     <div class="card-section">
         <div class="card-section-header">
@@ -140,8 +146,8 @@ require_once __DIR__ . '/../includes/header.php';
                                 </td>
                                 <td>
                                     <div class="action-links" style="justify-content: center;">
-                                        <a href="?edit=<?= $div['id'] ?>" class="action-link edit">Edit</a>
-                                        <a href="?delete=<?= $div['id'] ?>" class="action-link delete">Hapus</a>
+                                        <a href="?edit=<?= $div['id'] ?>" class="action-link edit" title="Edit"><span class="material-symbols-rounded">edit</span></a>
+                                        <a href="?delete=<?= $div['id'] ?>" class="action-link delete" title="Hapus"><span class="material-symbols-rounded">delete</span></a>
                                     </div>
                                 </td>
                             </tr>
@@ -151,13 +157,16 @@ require_once __DIR__ . '/../includes/header.php';
             </table>
         </div>
     </div>
+</div>
 
-    <!-- Form Add / Edit -->
-    <div class="card-section">
-        <div class="card-section-header">
-            <h2 class="card-section-title"><?= $edit_div ? 'Edit Divisi' : 'Tambah Divisi Baru' ?></h2>
+<!-- Modal for Division Add/Edit -->
+<div id="form-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-title-text"><?= $edit_div ? 'Edit Divisi' : 'Tambah Divisi Baru' ?></h2>
+            <span class="modal-close" id="modal-close-btn">&times;</span>
         </div>
-        <div style="padding: 1.5rem;">
+        <div class="modal-body">
             <form action="divisions.php" method="POST">
                 <input type="hidden" name="action" value="<?= $edit_div ? 'edit' : 'add' ?>">
                 <?php if ($edit_div): ?>
@@ -169,7 +178,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="text" name="name" id="name" class="form-control" placeholder="Contoh: HRGA, IT, QC" value="<?= $edit_div ? htmlspecialchars($edit_div['name']) : '' ?>" required>
                 </div>
                 
-                <div class="form-group" style="margin-bottom: 1.5rem;">
+                <div class="form-group" style="margin-top: 1rem; margin-bottom: 1.75rem;">
                     <label for="akses_perbaikan" class="form-label">Akses Tindakan Perbaikan</label>
                     <select name="akses_perbaikan" id="akses_perbaikan" class="form-control" required>
                         <option value="1" <?= (!$edit_div || $edit_div['akses_perbaikan'] == 1) ? 'selected' : '' ?>>Boleh (Bisa Edit/Perbaikan)</option>
@@ -179,9 +188,7 @@ require_once __DIR__ . '/../includes/header.php';
                 
                 <div style="display: flex; gap: 0.75rem;">
                     <button type="submit" class="btn btn-primary" style="flex: 1;"><?= $edit_div ? 'Simpan Perubahan' : 'Tambah Divisi' ?></button>
-                    <?php if ($edit_div): ?>
-                        <a href="divisions.php" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center;">Batal</a>
-                    <?php endif; ?>
+                    <button type="button" id="btn-cancel-form" class="btn btn-secondary" style="min-width: 100px;">Batal</button>
                 </div>
             </form>
         </div>
@@ -189,3 +196,52 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const editDiv = <?= json_encode($edit_div) ?>;
+    
+    const modal = document.getElementById('form-modal');
+    const btnTriggerAdd = document.getElementById('btn-trigger-add');
+    const btnCloseModal = document.getElementById('modal-close-btn');
+    const btnCancelForm = document.getElementById('btn-cancel-form');
+
+    // Automatically open modal in Edit Mode
+    if (editDiv && modal) {
+        modal.classList.add('active');
+    }
+
+    // Toggle modal show
+    if (btnTriggerAdd && modal) {
+        btnTriggerAdd.addEventListener('click', () => {
+            modal.classList.add('active');
+        });
+    }
+
+    // Toggle modal close handlers
+    function closeModal() {
+        if (editDiv) {
+            window.location.href = 'divisions.php';
+        } else if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    if (btnCloseModal) {
+        btnCloseModal.addEventListener('click', closeModal);
+    }
+    if (btnCancelForm) {
+        btnCancelForm.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeModal();
+        });
+    }
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }
+});
+</script>
