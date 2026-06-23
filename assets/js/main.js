@@ -240,4 +240,173 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Camera watermark timestamp handler
+    document.addEventListener('change', (e) => {
+        if (e.target && e.target.classList.contains('file-input-group') && e.target.dataset.type === 'camera') {
+            const input = e.target;
+            
+            // Check if already processed
+            if (input.dataset.processed === 'true') {
+                input.removeAttribute('data-processed');
+                return;
+            }
+            
+            const file = input.files ? input.files[0] : null;
+            if (!file) return;
+            
+            // Find parent form and disable submit buttons
+            const form = input.closest('form');
+            const submitBtns = form ? form.querySelectorAll('button[type="submit"]') : [];
+            const container = input.closest('.custom-file-upload');
+            const subtext = container ? container.querySelector('.custom-file-subtext') : null;
+            
+            // Set indicator and disable buttons
+            submitBtns.forEach(btn => {
+                btn.disabled = true;
+                if (!btn.dataset.originalText) {
+                    btn.dataset.originalText = btn.innerHTML;
+                }
+                btn.textContent = 'Memproses Foto...';
+            });
+            
+            if (subtext) {
+                subtext.textContent = 'Menambahkan tanggal...';
+            }
+            
+            try {
+                const objectUrl = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = function() {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        let width = img.naturalWidth || img.width;
+                        let height = img.naturalHeight || img.height;
+                        
+                        // Limit size to avoid browser canvas memory limits on mobile
+                        const maxDim = 1200;
+                        if (width > maxDim || height > maxDim) {
+                            const ratio = width / height;
+                            if (width > height) {
+                                width = maxDim;
+                                height = Math.round(maxDim / ratio);
+                            } else {
+                                height = maxDim;
+                                width = Math.round(maxDim * ratio);
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        // Draw image resized
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Clean memory immediately
+                        URL.revokeObjectURL(objectUrl);
+                        
+                        // Dynamic font size (about 3.5% of canvas width)
+                        const fontSize = Math.max(18, Math.round(width * 0.035));
+                        
+                        // Date/Time info
+                        const now = new Date();
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        const timeText = `${hours}:${minutes}`;
+                        
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const months = [
+                            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+                        ];
+                        const monthName = months[now.getMonth()];
+                        const year = now.getFullYear();
+                        const dateText = `${day} ${monthName} ${year}`;
+                        
+                        // Setup canvas text styles
+                        ctx.font = `bold ${fontSize}px sans-serif`;
+                        ctx.textAlign = 'right';
+                        ctx.textBaseline = 'bottom';
+                        
+                        // Orange digital stamp look with a black border
+                        ctx.fillStyle = '#ff8800';
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
+                        
+                        // Coordinates (at bottom-right corner)
+                        const paddingX = Math.round(width * 0.04);
+                        const paddingY = Math.round(height * 0.04);
+                        
+                        const x = width - paddingX;
+                        const y2 = height - paddingY;
+                        const y1 = y2 - Math.round(fontSize * 1.25);
+                        
+                        // Draw Time
+                        ctx.strokeText(timeText, x, y1);
+                        ctx.fillText(timeText, x, y1);
+                        
+                        // Draw Date
+                        ctx.strokeText(dateText, x, y2);
+                        ctx.fillText(dateText, x, y2);
+                        
+                        // Output to Blob
+                        canvas.toBlob((blob) => {
+                            try {
+                                if (blob) {
+                                    const watermarkedFile = new File([blob], file.name, {
+                                        type: 'image/jpeg',
+                                        lastModified: Date.now()
+                                    });
+                                    
+                                    const dataTransfer = new DataTransfer();
+                                    dataTransfer.items.add(watermarkedFile);
+                                    input.files = dataTransfer.files;
+                                    
+                                    input.dataset.processed = 'true';
+                                }
+                                
+                                // Restore form state
+                                restoreSubmitState(submitBtns);
+                                
+                                // Trigger change event to refresh custom styled subtexts
+                                input.dispatchEvent(new Event('change', { bubbles: true }));
+                            } catch (e) {
+                                alert("Gagal memperbarui file input: " + e.message);
+                                restoreSubmitState(submitBtns);
+                            }
+                        }, 'image/jpeg', 0.9);
+                        
+                    } catch (err) {
+                        alert("Error pemrosesan gambar: " + err.message);
+                        restoreSubmitState(submitBtns);
+                    }
+                };
+                
+                img.onerror = function() {
+                    URL.revokeObjectURL(objectUrl);
+                    alert("Gagal memuat gambar untuk stempel waktu.");
+                    restoreSubmitState(submitBtns);
+                };
+                
+                img.src = objectUrl;
+                
+            } catch (err) {
+                alert("Gagal membaca file kamera: " + err.message);
+                restoreSubmitState(submitBtns);
+            }
+        }
+    });
+
+    function restoreSubmitState(submitBtns) {
+        submitBtns.forEach(btn => {
+            btn.disabled = false;
+            if (btn.dataset.originalText) {
+                btn.innerHTML = btn.dataset.originalText;
+                btn.removeAttribute('data-original-text');
+            }
+        });
+    }
 });
+
